@@ -23,7 +23,7 @@ function avviaScanner(){
     scanner=new Html5Qrcode("reader");
     scannerAttivo=true;
 
-    scanner.start({facingMode:{ideal:"environment"}},{
+    scanner.start({facingMode:"environment"},{        
         fps:10,
         qrbox:{width:280,height:180},
         formatsToSupport:[
