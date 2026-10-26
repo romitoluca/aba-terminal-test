@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#266431">
+<title>ABA Terminal</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+<div id="app">
+<header><h1>ABA Terminal</h1><p>Terminale portatile</p></header>
+<main>
+<button id="btnScanner" class="primary">📷 SCANSIONA</button>
+<div id="reader" class="reader"></div>
+<section class="form">
+<label for="barcode">Barcode / Codice prodotto</label>
+<input type="text" id="barcode" placeholder="Barcode o codice prodotto" autocomplete="off">
+<label for="modello">Modello</label>
+<input type="text" id="modello" placeholder="Modello" autocomplete="off">
+<label for="matricola">Matricola</label>
+<input type="text" id="matricola" placeholder="Matricola" autocomplete="off">
+<label>Quantità</label>
+<div class="quantity">
+<button id="btnMeno" type="button">−</button>
+<input type="number" id="quantita" value="1" min="1" readonly>
+<button id="btnPiu" type="button">+</button>
+</div>
+<button id="btnAggiungi" class="success" type="button">➕ AGGIUNGI</button>
+</section>
+<section><h2>Articoli acquisiti</h2><div id="listaArticoli"></div></section>
+<button id="btnEsporta" class="export" type="button">📄 ESPORTA CSV</button>
+</main>
+<footer>ABA Terminal · Versione 1.2</footer>
+</div>
+<script src="js/app.js"></script>
+<script src="js/scanner.js"></script>
+<script src="js/export.js"></script>
+</body>
+</html>
