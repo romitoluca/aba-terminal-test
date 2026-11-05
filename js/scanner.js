@@ -123,6 +123,20 @@ function interpretaCodice(testo) {
         matricola: ""
     };
 
+    // FORMATO RT-30 NERA
+    const rt30 = testo.trim().match(
+        /^(RT-30\s+.+?)\s+([A-Z0-9]{6,})\s+(\d{5,})$/i
+    );
+
+    if (rt30) {
+        risultato.tipo = "qr-rt30";
+        risultato.modello = rt30[1].trim();
+        risultato.matricola = rt30[2];
+        risultato.barcode = rt30[3];
+        return risultato;
+    }
+
+    // FORMATI JSON, ANCHE SE NON PERFETTAMENTE VALIDI
     function estrai(campo) {
         const regex = new RegExp(
             '"' + campo + '"\\s*:\\s*"([^"]*)"',
