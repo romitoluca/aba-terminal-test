@@ -123,42 +123,24 @@ function interpretaCodice(testo) {
         matricola: ""
     };
 
-    let dati;
-
-    try {
-        dati = JSON.parse(testo);
-    } catch (e) {
-        return risultato;
+    function estrai(campo) {
+        const regex = new RegExp(
+            '"' + campo + '"\\s*:\\s*"([^"]*)"',
+            "i"
+        );
+        const match = testo.match(regex);
+        return match ? match[1].trim() : "";
     }
 
-    risultato.tipo = "qr-json";
+    const modello = estrai("mod");
+    const matricola = estrai("matr");
+    const codice = estrai("code");
 
-    const m = dati && dati.macc ? dati.macc : {};
-
-    risultato.modello = primoValore([
-        m.mod, dati.mod, m.model, dati.model
-    ]);
-
-    risultato.matricola = primoValore([
-        m.matr, dati.matr, m.serial, dati.serial
-    ]);
-
-    risultato.barcode = primoValore([
-        m.code, dati.code, m.productCode, dati.productCode
-    ]);
-
-    if (!risultato.barcode && m.crt) {
-        risultato.barcode = primoValore([
-            m.crt.code,
-            m.crt.cod,
-            m.crt.productCode,
-            m.crt.cusdis,
-            m.crt.opedis
-        ]);
-    }
-
-    if (!risultato.barcode) {
-        risultato.barcode = testo.trim();
+    if (modello || matricola || codice) {
+        risultato.tipo = "qr-json";
+        risultato.modello = modello;
+        risultato.matricola = matricola;
+        risultato.barcode = codice;
     }
 
     return risultato;
