@@ -1,4 +1,3 @@
-
 /* ABA TERMINAL - SCANNER
    Barcode standard + QR RT-30 + QR RT-40V2
 */
@@ -44,7 +43,7 @@ function avviaScanner() {
     scannerAttivo = true;
 
     const configurazione = {
-        fps: 10,
+        fps: 15,
 
         qrbox: {
             width: 280,
