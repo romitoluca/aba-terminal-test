@@ -1,8 +1,19 @@
+
+/* ABA TERMINAL - SCANNER
+   Barcode standard + QR RT-30 + QR RT-40V2
+*/
+
 let scanner = null;
 let scannerAttivo = false;
+let elaborazioneInCorso = false;
 
+// COLLEGAMENTO PULSANTE SCANNER
 document.addEventListener("DOMContentLoaded", function () {
-    document.getElementById("btnScanner").addEventListener("click", function () {
+    const pulsante = document.getElementById("btnScanner");
+
+    if (!pulsante) return;
+
+    pulsante.addEventListener("click", function () {
         if (scannerAttivo) {
             fermaScanner();
         } else {
@@ -11,30 +22,35 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 
-async function avviaScanner() {
+// AVVIO FOTOCAMERA
+function avviaScanner() {
     const reader = document.getElementById("reader");
     const pulsante = document.getElementById("btnScanner");
+
+    if (!reader || !pulsante) return;
 
     if (typeof Html5Qrcode === "undefined") {
         alert("Libreria scanner non disponibile.");
         return;
     }
 
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Fotocamera non disponibile. Apri ABA Terminal tramite HTTPS.");
-        return;
-    }
-
     reader.style.display = "block";
     reader.innerHTML = "";
+
     pulsante.textContent = "⏹ CHIUDI SCANNER";
 
+    elaborazioneInCorso = false;
     scanner = new Html5Qrcode("reader");
     scannerAttivo = true;
 
     const configurazione = {
         fps: 10,
-        qrbox: { width: 280, height: 180 },
+
+        qrbox: {
+            width: 280,
+            height: 180
+        },
+
         formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.EAN_13,
@@ -49,65 +65,68 @@ async function avviaScanner() {
         ]
     };
 
-    try {
-        let fotocamere = await Html5Qrcode.getCameras();
+    scanner.start(
+        { facingMode: "environment" },
+        configurazione,
 
-        if (!scannerAttivo) return;
+        function (testo) {
+            acquisizioneRiuscita(testo);
+        },
 
-        if (fotocamere && fotocamere.length > 0) {
-            let posteriore = fotocamere.find(c =>
-                /back|rear|environment|posteriore/i.test(c.label)
-            );
-
-            let camera = posteriore || fotocamere[fotocamere.length - 1];
-
-            await scanner.start(
-                camera.id,
-                configurazione,
-                acquisizioneRiuscita,
-                function () {}
-            );
-        } else {
-            await scanner.start(
-                { facingMode: "environment" },
-                configurazione,
-                acquisizioneRiuscita,
-                function () {}
-            );
+        function () {
+            // Nessuna azione durante la ricerca del codice.
         }
 
-    } catch (errore) {
+    ).catch(function (errore) {
+
         scannerAttivo = false;
+        scanner = null;
+
         reader.style.display = "none";
         pulsante.textContent = "📷 SCANSIONA";
 
-        if (scanner) {
-            try {
-                await scanner.clear();
-            } catch (e) {}
-            scanner = null;
-        }
-
-        alert("ERRORE FOTOCAMERA:\n\n" + errore);
-    }
+        alert(
+            "Impossibile aprire la fotocamera.\n\n" +
+            errore
+        );
+    });
 }
 
+// GESTIONE LETTURA RIUSCITA
 function acquisizioneRiuscita(testo) {
-    if (!scannerAttivo) return;
 
-    vibra();
+    if (!scannerAttivo || elaborazioneInCorso) return;
+
+    elaborazioneInCorso = true;
 
     const dati = interpretaCodice(testo);
 
-    document.getElementById("barcode").value = dati.barcode || "";
-    document.getElementById("modello").value = dati.modello || "";
-    document.getElementById("matricola").value = dati.matricola || "";
+    const campoBarcode = document.getElementById("barcode");
+    const campoModello = document.getElementById("modello");
+    const campoMatricola = document.getElementById("matricola");
+
+    if (campoBarcode) {
+        campoBarcode.value = dati.barcode || "";
+    }
+
+    if (campoModello) {
+        campoModello.value = dati.modello || "";
+    }
+
+    if (campoMatricola) {
+        campoMatricola.value = dati.matricola || "";
+    }
+
+    vibra();
 
     fermaScanner();
 
-    if (dati.tipo === "qr-json") {
+    if (
+        dati.tipo === "qr-rt30" ||
+        dati.tipo === "qr-rt40"
+    ) {
         alert(
-            "QR acquisito.\n\n" +
+            "QR acquisito!\n\n" +
             "Modello: " + (dati.modello || "-") + "\n" +
             "Matricola: " + (dati.matricola || "-") + "\n" +
             "Codice prodotto: " + (dati.barcode || "-")
@@ -115,92 +134,149 @@ function acquisizioneRiuscita(testo) {
     }
 }
 
+// INTERPRETAZIONE DEI CODICI
 function interpretaCodice(testo) {
+
+    const originale = String(testo || "").trim();
+
     const risultato = {
-        tipo: "codice",
-        barcode: testo.trim(),
+        tipo: "barcode",
+        barcode: originale,
         modello: "",
         matricola: ""
     };
 
+    if (!originale) return risultato;
+
+    // --------------------------------
     // FORMATO RT-30 NERA
-    const rt30 = testo.trim().match(
+    // Esempio:
+    // RT-30 NERA 3CEAM114880 9911044
+    // --------------------------------
+
+    const rt30 = originale.match(
         /^(RT-30\s+.+?)\s+([A-Z0-9]{6,})\s+(\d{5,})$/i
     );
 
     if (rt30) {
+
         risultato.tipo = "qr-rt30";
         risultato.modello = rt30[1].trim();
-        risultato.matricola = rt30[2];
-        risultato.barcode = rt30[3];
+        risultato.matricola = rt30[2].trim();
+        risultato.barcode = rt30[3].trim();
+
         return risultato;
     }
 
-    // FORMATI JSON, ANCHE SE NON PERFETTAMENTE VALIDI
-    function estrai(campo) {
-        const regex = new RegExp(
-            '"' + campo + '"\\s*:\\s*"([^"]*)"',
-            "i"
-        );
-        const match = testo.match(regex);
-        return match ? match[1].trim() : "";
-    }
+    // --------------------------------
+    // FORMATO RT-40V2
+    // Non utilizziamo JSON.parse perché
+    // alcuni QR contengono JSON malformato.
+    // --------------------------------
 
-    const modello = estrai("mod");
-    const matricola = estrai("matr");
-    const codice = estrai("code");
+    const modello = estraiCampo(originale, "mod");
+    const matricola = estraiCampo(originale, "matr");
+    const codice = estraiCampo(originale, "code");
 
     if (modello || matricola || codice) {
-        risultato.tipo = "qr-json";
+
+        risultato.tipo = "qr-rt40";
+
         risultato.modello = modello;
         risultato.matricola = matricola;
+
+        // IMPORTANTE:
+        // Il codice prodotto viene preso esclusivamente
+        // dal campo "code", mai dalla matricola.
+
         risultato.barcode = codice;
+
+        return risultato;
     }
 
+    // BARCODE STANDARD
     return risultato;
 }
 
-function primoValore(valori) {
-    for (let i = 0; i < valori.length; i++) {
-        if (
-            valori[i] !== undefined &&
-            valori[i] !== null &&
-            String(valori[i]).trim() !== ""
-        ) {
-            return String(valori[i]).trim();
-        }
-    }
+// ESTRAZIONE CAMPI DAL QR
+function estraiCampo(testo, nomeCampo) {
 
-    return "";
+    const chiave = nomeCampo.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&"
+    );
+
+    const regex = new RegExp(
+        '"' + chiave + '"\\s*:\\s*"([^"]*)"',
+        "i"
+    );
+
+    const corrispondenza = testo.match(regex);
+
+    return corrispondenza
+        ? corrispondenza[1].trim()
+        : "";
 }
 
+// VIBRAZIONE
 function vibra() {
+
     try {
         if ("vibrate" in navigator) {
             navigator.vibrate([120, 60, 120]);
         }
-    } catch (e) {}
+    } catch (errore) {
+        // Vibrazione non disponibile.
+    }
 }
 
-async function fermaScanner() {
+// ARRESTO SCANNER
+function fermaScanner() {
+
     const reader = document.getElementById("reader");
     const pulsante = document.getElementById("btnScanner");
 
     scannerAttivo = false;
 
-    if (scanner) {
-        try {
-            await scanner.stop();
-        } catch (e) {}
+    if (!scanner) {
 
-        try {
-            await scanner.clear();
-        } catch (e) {}
+        if (reader) {
+            reader.innerHTML = "";
+            reader.style.display = "none";
+        }
 
-        scanner = null;
+        if (pulsante) {
+            pulsante.textContent = "📷 SCANSIONA";
+        }
+
+        return;
     }
 
-    reader.innerHTML = "";
-    reader.style.display = "none";
-    pulsante.textContent = "📷 SCANSIONA";
+    const scannerDaFermare = scanner;
+
+    scanner = null;
+
+    scannerDaFermare.stop()
+
+        .catch(function () {
+            // Scanner già fermato.
+        })
+
+        .finally(function () {
+
+            try {
+                scannerDaFermare.clear();
+            } catch (errore) {
+                // Nessuna azione necessaria.
+            }
+
+            if (reader) {
+                reader.innerHTML = "";
+                reader.style.display = "none";
+            }
+
+            if (pulsante) {
+                pulsante.textContent = "📷 SCANSIONA";
+            }
+        });
 }
